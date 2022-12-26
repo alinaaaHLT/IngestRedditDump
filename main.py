@@ -4,6 +4,8 @@ import html
 from db import (Comment as db_Comment, Submission as db_Submission)
 import psycopg2
 from argparse import ArgumentParser
+import logging
+
 
 filename = "F:\\RedditDump\\RS_2022-10"
 
@@ -82,7 +84,6 @@ def main():
                             submission_keys = (
                             'id', 'author', 'author_flair_text', 'created_utc', 'is_self', 'num_comments',
                             'over_18','permalink', 'score', 'selftext', 'spoiler', 'subreddit', 'title', 'url')
-
                             submission_dict = {}
                             for i in json_item:
                                 if i in submission_keys:
@@ -102,8 +103,8 @@ def main():
                             print(f"submission {json_item['id']} was ingested in database")
                         else:
                             print(f"submission {json_item['id']} already in database")
-                except:
-                    print("An exception occurred")
+                except Exception as e:
+                    logger.error('Failed to upload to ftp: ' + str(e))
                 if query_count >= 25:
                     connection.commit()
                     query_count = 0
