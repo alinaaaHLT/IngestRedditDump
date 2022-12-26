@@ -29,76 +29,81 @@ def main():
             for line in f:
                 json_item = json.loads(line)
                 # Do something with 'line'
-                if json_item['author'] == '[deleted]':
-                    continue
-                if 'body' in json_item:
-                    # if 'body' is present then assume it's a comment
-                    id = json_item["id"]
-                    # id = '123456'
-                    cursor.execute("SELECT id FROM comment WHERE id = %s", (id,))
-                    db_record = cursor.fetchall()
+                try:
+                    if json_item['author'] == '[deleted]':
+                        continue
+                    if 'body' in json_item:
+                        # if 'body' is present then assume it's a comment
+                        id = json_item["id"]
+                        # id = '123456'
+                        cursor.execute("SELECT id FROM comment WHERE id = %s", (id,))
+                        db_record = cursor.fetchall()
 
-                    if not db_record:
-                        json_item['body'] = clean_text(json_item['body'])
+                        if not db_record:
+                            json_item['body'] = clean_text(json_item['body'])
 
-                        # Try to detect whether the comment is a URL only with no text so we can ignore it later
-                        json_item['subreddit'] = clean_text(json_item['subreddit'])
-                        json_item['permalink'] = clean_text(json_item['permalink'])
-                        json_item['is_url_only'] = (json_item['body'].startswith('[') and json_item['body'].endswith(
-                            ')')) \
-                                                   or ('http' in json_item['body'].lower() and ' ' not in json_item[
-                            'body'])
-                        comment_keys = ('id', 'author', 'author_flair_text', 'body', 'created_utc', 'link_id',
-                                        'parent_id', 'is_url_only', 'score', 'stickied')
-                        comment_dict = {}
-                        for i in json_item:
-                            if i in comment_keys:
-                                comment_dict[i] = json_item[i]
+                            # Try to detect whether the comment is a URL only with no text so we can ignore it later
+                            json_item['subreddit'] = clean_text(json_item['subreddit'])
+                            json_item['permalink'] = clean_text(json_item['permalink'])
+                            json_item['is_url_only'] = (json_item['body'].startswith('[') and json_item['body'].endswith(
+                                ')')) \
+                                                       or ('http' in json_item['body'].lower() and ' ' not in json_item[
+                                'body'])
+                            comment_keys = ('id', 'author', 'author_flair_text', 'body', 'created_utc', 'link_id',
+                                            'parent_id', 'is_url_only', 'score', 'stickied')
+                            comment_dict = {}
+                            for i in json_item:
+                                if i in comment_keys:
+                                    comment_dict[i] = json_item[i]
 
-                        keys = comment_dict.keys()
-                        columns = ','.join(keys)
-                        values = ','.join(['%({})s'.format(k) for k in keys])
-                        insert = 'insert into comment ({0}) values ({1})'.format(columns, values)
+                            keys = comment_dict.keys()
+                            columns = ','.join(keys)
+                            values = ','.join(['%({})s'.format(k) for k in keys])
+                            insert = 'insert into comment ({0}) values ({1})'.format(columns, values)
 
-                        # print(cursor.mogrify(insert, json_item))
-                        cursor.execute((cursor.mogrify(insert, json_item)))
-                        print(f"comment {json_item['id']} was ingested in database")
-                    else:
-                        print(f"comment {json_item['id']} already in database")
+                            # print(cursor.mogrify(insert, json_item))
+                            cursor.execute((cursor.mogrify(insert, json_item)))
+                            print(f"comment {json_item['id']} was ingested in database")
+                        else:
+                            print(f"comment {json_item['id']} already in database")
 
-                elif 'selftext' in json_item or 'url' in json_item:
-                    # if 'selftext' is present then assume it's a submission
-                    id = json_item["id"]
-                    # id = '123456'
-                    cursor.execute("SELECT id FROM submission WHERE id = %s", (id,))
-                    db_record = cursor.fetchall()
+                    elif 'selftext' in json_item or 'url' in json_item:
+                        # if 'selftext' is present then assume it's a submission
+                        id = json_item["id"]
+                        # id = '123456'
+                        cursor.execute("SELECT id FROM submission WHERE id = %s", (id,))
+                        db_record = cursor.fetchall()
 
-                    if not db_record:
-                        json_item['selftext'] = clean_text(json_item['selftext'])
-                        json_item['url'] = clean_text(json_item['url'])
-                        json_item['subreddit'] = clean_text(json_item['subreddit'])
-                        json_item['permalink'] = clean_text(json_item['permalink'])
-                        submission_keys = (
-                        'id', 'author', 'author_flair_text', 'created_utc', 'is_self', 'num_comments',
-                        'over_18','permalink', 'score', 'selftext', 'spoiler', 'subreddit', 'title', 'url')
+                        if not db_record:
+                            json_item['selftext'] = clean_text(json_item['selftext'])
+                            json_item['url'] = clean_text(json_item['url'])
+                            json_item['subreddit'] = clean_text(json_item['subreddit'])
+                            json_item['permalink'] = clean_text(json_item['permalink'])
+                            submission_keys = (
+                            'id', 'author', 'author_flair_text', 'created_utc', 'is_self', 'num_comments',
+                            'over_18','permalink', 'score', 'selftext', 'spoiler', 'subreddit', 'title', 'url')
 
-                        submission_dict = {}
-                        for i in json_item:
-                            if i in submission_keys:
-                                submission_dict[i] = json_item[i]
+                            submission_dict = {}
+                            for i in json_item:
+                                if i in submission_keys:
+                                    if json_item.find('\x00'):
+                                        json_item[i] = json_item[i].replace('\x00','')
+                                    submission_dict[i] = json_item[i]
 
-                        keys = submission_dict.keys()
-                        columns = ','.join(keys)
-                        values = ','.join(['%({})s'.format(k) for k in keys])
-                        insert = 'insert into submission ({0}) values ({1})'.format(columns, values)
+                            keys = submission_dict.keys()
+                            columns = ','.join(keys)
+                            values = ','.join(['%({})s'.format(k) for k in keys])
+                            insert = 'insert into submission ({0}) values ({1})'.format(columns, values)
 
-                        test = (cursor.mogrify(insert, submission_dict))
-                        cursor.execute((cursor.mogrify(insert, submission_dict)))
-                # if verbose:
-                #    print(f"submission {json_item['id']} written to database")
-                        print(f"submission {json_item['id']} was ingested in database")
-                    else:
-                        print(f"submission {json_item['id']} already in database")
+                            test = (cursor.mogrify(insert, submission_dict))
+                            cursor.execute((cursor.mogrify(insert, submission_dict)))
+                    # if verbose:
+                    #    print(f"submission {json_item['id']} written to database")
+                            print(f"submission {json_item['id']} was ingested in database")
+                        else:
+                            print(f"submission {json_item['id']} already in database")
+                except:
+                    print("An exception occurred")
                 if query_count >= 25:
                     connection.commit()
                     query_count = 0
